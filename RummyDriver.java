@@ -1,36 +1,56 @@
 package rummy;
 import java.lang.Math;
 import java.util.*;
-import rummy.*;
+import java.util.concurrent.TimeUnit;
+
+//import rummy.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+/* rUmmY UpdAtEs
+ * 
+ * (16/4/20)
+ * > Completed:  
+ * 		- allowed to sort own cards in preferential order /\ (38) \/ (40)
+ * 		- fixed the putting down jokers
+ * 		- created JLIST and simplified SO MUCH
+ * 		- fixed summing for rounds (broke sorting)
+ * > To Do: 
+ * 		- allow to play down on others/own hands
+ * 		- when sort own hands, ensure it updates player arrays as well
+ * 		- sorting of points broke idk how
+ * 
+ */
+
 public class RummyDriver {
-	
-	public static void main(String[] args) {
+		
+	public static void main(String[] args) throws InterruptedException {
 		int turn = 0;
 		int round = 0;
-		int numPlayers;
+		int numPlayers = 0;
 		boolean pat = false;
 		boolean playRound = true;
 		int setsRuns = 0;
 		
-		Card buyCard = new Card();
-		Stack<Card> discardPile = new Stack<Card>();
 		
-		boolean firstTurn = true;
-		
-
-		LinkedList<Card> deck = new LinkedList<Card>();
-		Scanner reader = new Scanner(System.in);
-		
-		System.out.println("How many people are playing?");
-		numPlayers = reader.nextInt();
-		
-		/** beginning game loop: runs 7 rounds ***/
-		for(round = 0; round<7; round++) {
+		RummyWindow window = new RummyWindow();
+		while(numPlayers == 0) {
+			numPlayers = window.getNumPlayers();
+		}
+		window.updateInstr("Great, you said: "+numPlayers+" are playing!");
+			
+		for(round = 0; round < 7; round ++) {
+			Card buyCard = new Card();
+			Stack<Card> discardPile = new Stack<Card>();
+			discardPile.push(new Card());
+			window.reset();
+			
+			boolean firstTurn = true;
+			LinkedList<Card> deck = new LinkedList<Card>();
+			
+			window.updateFrame(round);
 			playRound = true;
 			
 			int dealtCards = 6 + round;
@@ -38,16 +58,10 @@ public class RummyDriver {
 				dealtCards --;
 				pat = true;
 			}
-			setsRuns = determineSetsRuns(round);
-			System.out.println("This round you're playing for: "
-					+ setsRuns/10 + " sets and " + setsRuns%10 +" runs!");
-			
-			/*** Creating deck, players & dealing cards according to num playing ***/
-			deck = createDeck(deck, numPlayers);
-			
+			deck = createDeck(numPlayers);
 			RummyPlayer[] players = new RummyPlayer[numPlayers];
 			for(int i = 0; i<numPlayers; i++) {
-				players[i] = new RummyPlayer();
+				players[i] = new RummyPlayer(i);
 			}
 			
 			for(int i = 0; i<dealtCards; i++) {
@@ -55,13 +69,20 @@ public class RummyDriver {
 					players[j].drawCard(deck);
 				}
 			}
-			
-			/** beginning round loop ***/
+			window.updatePlayers(players);
+			turn = round%numPlayers;
 			
 			while(playRound) {
+				window.done.setInt(0);
+				window.pickUp.setInt(2);
+				boolean bought = false;
+				
 				if(turn == numPlayers) {
 					turn = 0;
 				}
+				window.updateInstr("Player "+turn+"'s turn! Pick up a card");
+
+				window.updatePlayer(turn, players[turn]);
 				
 				/*** picking up card ***/
 				
@@ -69,115 +90,164 @@ public class RummyDriver {
 					int range = deck.size();
 					int rand = (int) (Math.random() * range);
 					buyCard = deck.get(rand);
+					discardPile.push(buyCard);
 					deck.remove(rand);
 					firstTurn = false;
 				}
-				System.out.println("Player "+turn+"'s cards:");
-				players[turn].printCards();
 				
-				System.out.println("Open card is: " + buyCard.getCard());
-				System.out.println("Pick up (0) or mystery? (1)");
-				int ans = reader.nextInt();
-				if(ans == 0) {
-					players[turn].addCard(buyCard);
+				window.updateCard(buyCard);
+				int k = 0;
+				/*try {
+					TimeUnit.SECONDS.sleep(3);
 				}
-				else if(ans==1) {
-					checkForBuy(deck, players, turn, numPlayers, buyCard, discardPile);
+				catch (InterruptedException ie) {
+					Thread.currentThread().interrupt();
+				}
+						*/		
+				while(window.done.getNum() == 0) {
+					try {
+						TimeUnit.SECONDS.sleep(2);
+						if(window.buying.getNum() == 1) {
+							bought = true;
+							int buyer = -2;
+							while(buyer == -2) {
+								buyer = window.buyingSequence();
+							}
+							if(buyer == -1) {
+								bought = false;
+								break;
+							}
+							else {
+								if(buyer == turn) {
+									window.updateInstr("you can't buy! it's your turn D:");
+									bought = false;
+								}
+								else if(buyer == (turn-1)) {
+									window.updateInstr("you can't buy! that's ur discard D:");
+									bought = false;
+								}
+								else {
+									players[buyer].addCard(buyCard);
+									players[buyer].drawCard(deck);
+									discardPile.pop();
+									window.updateCard(new Card());
+									window.buying.setInt(0);
+									window.updateInstr("Player "+turn+", pick up a card!");
+									window.updatePlayers(players);
+
+								}
+							}
+						}
+					}
+					catch (InterruptedException ie) {
+						Thread.currentThread().interrupt();
+					}
+				}
+				
+				window.updateInstr("Player "+turn+"'s turn! Pick up a card");
+
+				k = window.pickUp.getNum();
+				
+				window.done.setInt(0);
+				window.pickUp.setInt(2);
+				
+				if(k==0 && bought==false) {
+					players[turn].addCard(buyCard);
+					discardPile.pop();
+					window.updateCard(new Card());
+				}
+				else if(k==1) {
 					players[turn].drawCard(deck);
 				}
-				
-				System.out.println("Player "+turn+"'s cards after pickup:");
 				players[turn].printCards();
-				
-				/*** check for going down/out ***/
-				
-				System.out.println("Going down?");
-				String answ = reader.next().toLowerCase();
-				if(answ.contains("y")) {
-					//future: create method in RummyPlayer class to check if indv. cards are OK
-					int sets = setsRuns/10;
-					int runs = setsRuns%10;
-					
-					Card[] downCards = new Card[sets*3 + runs*4];
-					int i = 0;
-					
-					for(int h = 0; h<sets; h++) {
-						System.out.println("Enter the cards in your set, one by one"
-								+ "\n ie. a,c (enter) a,d (enter) a,s"
-								+ "\n for an ace of clubs, diamonds and spades.");
-						for(int set = 0; set<3; set++) {
-							String name = reader.next();
-							Card dummyCard = createCard(name);
-							downCards[i] = dummyCard;
-							i++;
-						}
-					}
-					for(int h = 0; h<runs; h++) {
-						System.out.println("Please enter the cards in your run, one by one"
-								+ "\n ie. 2,c (enter) 3,c (enter) 4,c (enter) 5,c (enter)");
-						for(int run = 0; run<4; run++) {
-							String name = reader.next();
-							Card dummyCard = createCard(name);
-							downCards[i] = dummyCard;
-							i++;
-						}
-					}
-					for(int k=0; k< (sets*3 + runs*4); k++) {
-						System.out.println(downCards[k].getCard());
-					}
-					
-					System.out.println("Do any other players object?"
-							+ "\n Enter yes if so, and no otherwise");
-					
-					String checked = reader.next();
-					if(checked.contains("y")) {
-						System.out.println("uh oh, try again!");
-						
-					}
-					else {
-						System.out.println("Good job player "+turn+"!");
-						for(int k = 0; k<(sets*3 + runs*4); k++) {
-							players[turn].discard(downCards[k]); }
-					}
-					
-					//future note: person saying cards right now, should print out to check too
-	
-					
-				}
-				
-				/*** discard card ***/
-				boolean correct = false;
-				while(!correct) {
-					System.out.println("Player "+turn+", what card would you like to discard?"
-							+ "\n write as format 8,c for 8 of clubs (a = ace; q = queen etc.)");
-					players[turn].printCards();
+				window.updatePlayer(turn, players[turn]);
+				window.updatePlayers(players);
 
-					String discCard = reader.next().toLowerCase();
-					Card toDiscard = createCard(discCard);
+				window.txtAnsInp.setText(" ");
+				boolean correct = false;
+				
+				while(!correct) {
+					boolean sel = false;
+					while(!sel) {
+						window.updateInstr("Player "+turn+", please select the card you want to discard!");
+						sel = window.checkSelection();
+						if(window.goingDown.getNum() == 1) {
+							window.goingDown(players[turn], round);
+						}
+						
+						try {
+							TimeUnit.SECONDS.sleep(1);
+						}
+						catch (InterruptedException ie) {
+							Thread.currentThread().interrupt();
+						}
+					}
+					
+					window.txtAnsInp.setText(" ");
+					
+					String disc = (String) window.list.getSelectedValue();
+					Card toDiscard = createCard(disc);
 					
 					correct = players[turn].discard(toDiscard);
+					if(!correct) {
+						window.updateInstr("whoops, that wasn't in your deck! try again");
+					}
 					buyCard = toDiscard;
+					discardPile.push(buyCard);
 				}
-
+				
+				window.updateCard(buyCard);
+				window.updatePlayer(turn,  players[turn]);
+				window.updateInstr("Great turn!");
+				
+				int j = 0;
 				
 				if(players[turn].cards.size() == 0) {
-					System.out.println("Good job player "+turn+"!"
-							+ "\n This round has ended!");
 					playRound = false;
+					j = 1;
+					window.updateInstr("good job, player "+turn+"!");
+					try {
+						TimeUnit.SECONDS.sleep(2);
+					}
+					catch (InterruptedException ie) {
+						Thread.currentThread().interrupt();
+					}
 				}
-				else {
-					System.out.println("Player "+turn+"'s cards:");
-					players[turn].printCards();	
-					turn++;
+				
+				while(j== 0) {
+					
+					try {
+						TimeUnit.SECONDS.sleep(1);
+					}
+					catch (InterruptedException ie) {
+						Thread.currentThread().interrupt();
+					}
+					j = window.next.getNum();
+				}
+				window.next.setInt(0);
+				
+				turn++;
+			}
+			window.updatePoints();
+			window.updateInstr("Enter ok when you're ready to move on!");
+			while(window.txtAnsInp.equals(" ")) {
+				try {
+					TimeUnit.SECONDS.sleep(1);
+				}
+				catch(InterruptedException e) {
+					Thread.currentThread().interrupt();
 				}
 			}
-			
-		}
-		
-		reader.close();
+			window.txtAnsInp.setText(" ");
+			window.updateFrame(round);
+		}	
 	}
+		
 	
-	public static LinkedList<Card> createDeck(LinkedList<Card> deck, int players) {
+	
+	public static LinkedList<Card> createDeck(int players) {
+		LinkedList<Card> deck = new LinkedList<Card>();
+		
 		int numDecks = 2;
 		if(players >= 5) {
 			numDecks = 3;
@@ -206,50 +276,12 @@ public class RummyDriver {
 		return deck;
 	}
 	
-	public static boolean checkForBuy(LinkedList<Card> deck, RummyPlayer[] players, int accTurn, int numsPlayers, Card buyCard, Stack<Card> discardPile) {
-		int turns = accTurn;
-		int nums = numsPlayers;
-		Scanner read = new Scanner(System.in);
-		int buyNext = turns; 
-		boolean looped = false;
-		boolean done = false;
-		int i = 0;
-		
-		while(!done) {
-			buyNext++; i++;
-			if(i == nums) {
-				done = true;
-				break;
-			}
-			System.out.println("buyNext == "+buyNext);
-			if(buyNext == nums) {
-				buyNext = 0;
-			}
-			
-			System.out.println("Player "+buyNext+"'s cards:");
-			players[buyNext].printCards();
-			
-			System.out.println("Does player " + buyNext+ " want to buy? (y/n)");
-			System.out.println("Open card is "+buyCard.getCard());
-			String ans = read.next();
-			if(ans.contains("y")) {
-				Card addIn = buyCard.copyCard();
-				players[buyNext].addCard(addIn);
-				players[buyNext].drawCard(deck);
-				System.out.println("Player "+buyNext+"'s cards:");
-				players[buyNext].printCards();
-				return true;
-			}
-			else {
-				continue;
-			}
-		}
-		discardPile.push(buyCard);
-		return false;
-	}
-	
 	public static Card createCard(String answer) {
 		String cardNum = answer.substring(0,1);
+		if(cardNum.equals(" ")) {
+			cardNum = answer.substring(1, 2);
+			answer = answer.substring(1);
+		}
 		int num = 0;
 		try {
 			num = Integer.parseInt(cardNum);
@@ -262,7 +294,7 @@ public class RummyDriver {
 				num = 1;
 			}
 			else if(cardNum.equals("j")) {
-				if(answer.contains("o")) {
+				if(answer.substring(1).contains("o")) {
 					num = 14;
 				}
 				else {
@@ -276,12 +308,21 @@ public class RummyDriver {
 				num = 13;
 			}
 		}
-		int comma = answer.indexOf(",");
-		char su = answer.charAt(comma+1);
+		char su;
+		try {
+			int comma = answer.indexOf(",");
+			su = answer.charAt(comma+1);
+			if(su == ' ') {
+				su = answer.charAt(comma+2);
+			}
+		}
+		catch (StringIndexOutOfBoundsException e) {
+			return new Card();
+		}
 		Card retr = new Card(num, su);
 		return retr;
-		
 	}
+	
 	public static int determineSetsRuns(int round) {
 		int sets, runs = 0;
 		if(round == 0) {

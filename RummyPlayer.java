@@ -29,9 +29,11 @@ public class RummyPlayer {
 	public boolean turn;
 	public boolean down;
 	public int points = 0;
+	public int num = 0;
 	public LinkedList<Card> cards;
 	
-	public RummyPlayer() {
+	public RummyPlayer(int plrNum) {
+		num = plrNum;
 		turn = false;
 		down = false;
 		points = 0;
@@ -57,31 +59,18 @@ public class RummyPlayer {
 		
 	}
 	
-	/*
-	public void goingDown(int round, int setsRuns) {
-		Determining what to check for per round 
-		int sets = setsRuns/10;
-		int runs = setsRuns%10;
-		
-		
-		asks to pick cards for sets/runs 
-		
-		Scanner read = new Scanner(System.in);
-		for(int i = 0; i<sets; i++) {
-			System.out.println("Enter the cards in your set, one by one"
-					+ "\n ie. a,c (enter) a,d (enter) a,s"
-					+ "\n if you're including a joker, please add it last!");
-			
-			String firstCard = read.nextLine();
-			String secCard = read.nextLine();
-			String thirCard = read.nextLine();
-			
-			String [] arr = {firstCard, secCard, thirCard};
-			boolean matching = true;
-			int firstNum = 0;
+	public int getRoundPoints() {
+		int sum = 0;
+		for(int i = 0; i<cards.size(); i++) {
+			sum+= cards.get(i).getPoints();
 		}
-	} 
-	*/
+		points+= sum;
+		return sum;
+	}
+	
+	public int getPoints() {
+		return points;
+	}
 	
 	public LinkedList<Card> checkSet(LinkedList<Card> copy) {
 		int maxCount = 0;
@@ -89,7 +78,7 @@ public class RummyPlayer {
 		boolean retrVal = false;
 		LinkedList<Card> retrCards = new LinkedList<Card>();
 		int num = 0;
-		for(int i = 0; i<copy.size(); i++) {
+		for(int i = 0; i<copy.size();   ) {
 			Card dummy = copy.get(i);
 			num = dummy.number;
 			for(int k = 0; k<copy.size(); k++) {
@@ -125,8 +114,12 @@ public class RummyPlayer {
 				cards.remove(i);
 				return true;
 			}
+			else if((cards.get(i).number == 14) && (disc.number == 14)) {
+				cards.remove(i);
+				return true;
+			}
 		}
-		System.out.println("that wasn't in your deck!");
+		System.out.println("wanst in the deck ! D:");
 		return false;
 	}
 	
@@ -135,5 +128,13 @@ public class RummyPlayer {
 			System.out.println(cards.get(k).getCard());
 		}
 		return true;
+	}
+	
+	public String getCards() {
+		String retr = "";
+		for(int k=0; k<cards.size(); k++) {
+			retr+=cards.get(k).getCard()+"\n";
+		}
+		return retr;
 	}
 }
